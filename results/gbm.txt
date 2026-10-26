@@ -1,0 +1,54 @@
+fit 707,292 (2022-23) | early-stop 175,398 + calibrate 175,415 (2024) | test 708,016 (2025-26)
+
+Model B (logistic, 2022-24)        acc 0.9351  logloss 0.1542  brier 0.0465  auc 0.9842
+GBM: zone + count (213 rounds)     acc 0.9405  logloss 0.1403  brier 0.0428  auc 0.9866
+GBM: + pitch (349 rounds)          acc 0.9417  logloss 0.1383  brier 0.0424  auc 0.9870
+GBM: + pitch + framing (257 rounds) acc 0.9413  logloss 0.1383  brier 0.0424  auc 0.9870
+
+accuracy by distance from the batter's zone edge (test set), Model B vs GBM: + pitch + framing:
+                     n  strike_rate  acc_B  acc_GBM
+bucket                                             
+> 6in inside    33,920        1.000  1.000    1.000
+3-6in inside    69,007        0.994  0.994    0.994
+1-3in inside    65,823        0.934  0.934    0.935
+0-1in inside    37,792        0.765  0.771    0.784
+0-1in outside   40,023        0.507  0.649    0.698
+1-3in outside   83,716        0.183  0.811    0.833
+3-6in outside  120,287        0.021  0.979    0.979
+> 6in outside  257,448        0.001  0.999    0.999
+
+mean |SHAP| (log-odds), GBM: + pitch + framing:
+zn               3.284
+xn               3.087
+strikes          0.354
+sz_top           0.143
+balls            0.102
+release_speed    0.101
+framing          0.099
+sz_bot           0.085
+batter_R         0.063
+pitch_type       0.042
+pfx_z            0.032
+pitcher_R        0.028
+pfx_x            0.028
+spin_rate        0.024
+
+called-strike rate within 1 inch of the zone edge, by pitch type (test set, n >= 2,000):
+     mean  count
+pt              
+FF  0.607  26364
+CH  0.617   5494
+FC  0.639   6452
+SL  0.649   9300
+CU  0.652   5036
+ST  0.654   5728
+SI  0.656  16271
+
+framing, called strikes above expectation per 1,000 called pitches (2022-24, 69 catchers with >= 5,000):
+0.0   -16.2
+0.1    -8.9
+0.5    -1.4
+0.9     9.4
+1.0    18.1
+
+wrote results/gbm.json

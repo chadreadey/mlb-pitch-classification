@@ -65,6 +65,19 @@ Accuracy by distance from the batter's zone edge (test set):
 Count effect (Model B, RHB, pitch exactly on the outside-corner edge, zone-centre height):
 P(strike) = 0.875 at 0-0 · 0.721 at 0-2 · 0.923 at 3-0. Roughly 20 points of zone from count alone.
 
+### Model C — LightGBM (`scripts/gbm.py`)
+Fit 2022–23; 2024 split by game into early-stopping and isotonic-calibration halves; test 2025–26.
+Params: lr 0.05, 127 leaves, min 500 per leaf, feature fraction 0.9, L2 1, early stopping 100.
+Framing score: catcher's mean residual (called_strike − Model B fit on 2022–23), shrunk by
+n / (n + 2000); out-of-fold by game (5 folds) for fit rows, from 2022–23 for 2024 rows, from
+2022–24 for test rows.
+
+| model | accuracy | log loss | Brier | AUC |
+|---|---|---|---|---|
+| GBM: zone + count | 94.05% | 0.1403 | 0.0428 | 0.9866 |
+| GBM: + pitch | 94.17% | 0.1383 | 0.0424 | 0.9870 |
+| GBM: + pitch + framing | 94.13% | 0.1383 | 0.0424 | 0.9870 |
+
 ## 5. Why the original 82.4% was so much lower (verified 2026-10-12)
 Three checks on Model A:
 1. Trained on a random 8,147-row sample of 2022–24 (the notebook's n), tested on 2025–26:
@@ -86,10 +99,10 @@ the Kaggle file would close this fully; not done.
 ## 6. Goals and open questions
 
 ### Near-term (decided, in order)
-1. **Gradient boosting.** LightGBM on Model-B features + pitch_type, release_speed, pfx_x,
-   pfx_z, p_throws, catcher ID (regularized: min leaf count, or replaced with a computed framing
-   score). Isotonic calibration fit on 2024, test on 2025–26. Target 94–95%, better log loss,
-   gains concentrated in the ±3 in edge band. Report SHAP and partial dependence.
+1. **Gradient boosting.** Done 2026-10-26 (`scripts/gbm.py`, see README §4): 94.17% / log loss
+   0.1383 / AUC 0.9870 with pitch features, gains concentrated within ±3 in of the edge. The
+   framing score added nothing measurable. Not done: partial dependence plots, seed spread,
+   moving the demo to the GBM (needs ONNX, step 4).
 2. **Umpire join.** Statcast has no umpire column. Pull home-plate umpire per game_pk from the
    MLB stats API (`/api/v1/game/{game_pk}/boxscore` → officials) and join. Then: per-umpire
    zone maps, umpire consistency ranking, and whether umpire ID beats catcher ID as a feature.
@@ -130,3 +143,5 @@ the Kaggle file would close this fully; not done.
 - 2026-10-26: `baseline_logit.py` writes Model B's raw-scale coefficients to `results/model_b.json`.
   `demo/index.html` now runs Model B instead of the 2019 notebook coefficients, with batter-side
   and zone-size controls. Its JS output matches Python to 5 decimals on spot checks.
+- 2026-10-26: shared loading/features moved to `scripts/common.py` (baseline output byte-identical).
+  Added `scripts/gbm.py` (Model C, LightGBM) and `results/gbm.{txt,json}`. Demo unchanged.

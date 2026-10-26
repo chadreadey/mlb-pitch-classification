@@ -1,0 +1,141 @@
+{
+  "splits": {
+    "fit": [
+      2022,
+      2023
+    ],
+    "early_stop_and_calibrate": [
+      2024
+    ],
+    "test": [
+      2025,
+      2026
+    ],
+    "n_fit": 707292,
+    "n_early_stop": 175398,
+    "n_calibrate": 175415,
+    "n_test": 708016
+  },
+  "params": {
+    "objective": "binary",
+    "learning_rate": 0.05,
+    "num_leaves": 127,
+    "min_data_in_leaf": 500,
+    "feature_fraction": 0.9,
+    "lambda_l2": 1.0,
+    "seed": 0,
+    "verbose": -1
+  },
+  "framing_shrink": 2000,
+  "test": {
+    "Model B (logistic, 2022-24)": {
+      "accuracy": 0.9351,
+      "log_loss": 0.1542,
+      "brier": 0.0465,
+      "auc": 0.9842
+    },
+    "GBM: zone + count": {
+      "accuracy": 0.9405,
+      "log_loss": 0.1403,
+      "brier": 0.0428,
+      "auc": 0.9866,
+      "rounds": 213.0
+    },
+    "GBM: + pitch": {
+      "accuracy": 0.9417,
+      "log_loss": 0.1383,
+      "brier": 0.0424,
+      "auc": 0.987,
+      "rounds": 349.0
+    },
+    "GBM: + pitch + framing": {
+      "accuracy": 0.9413,
+      "log_loss": 0.1383,
+      "brier": 0.0424,
+      "auc": 0.987,
+      "rounds": 257.0
+    }
+  },
+  "edge_accuracy": {
+    "> 6in inside": {
+      "n": 33920,
+      "strike_rate": 1.0,
+      "acc_B": 1.0,
+      "acc_GBM": 1.0
+    },
+    "3-6in inside": {
+      "n": 69007,
+      "strike_rate": 0.994,
+      "acc_B": 0.994,
+      "acc_GBM": 0.994
+    },
+    "1-3in inside": {
+      "n": 65823,
+      "strike_rate": 0.934,
+      "acc_B": 0.934,
+      "acc_GBM": 0.935
+    },
+    "0-1in inside": {
+      "n": 37792,
+      "strike_rate": 0.765,
+      "acc_B": 0.771,
+      "acc_GBM": 0.784
+    },
+    "0-1in outside": {
+      "n": 40023,
+      "strike_rate": 0.507,
+      "acc_B": 0.649,
+      "acc_GBM": 0.698
+    },
+    "1-3in outside": {
+      "n": 83716,
+      "strike_rate": 0.183,
+      "acc_B": 0.811,
+      "acc_GBM": 0.833
+    },
+    "3-6in outside": {
+      "n": 120287,
+      "strike_rate": 0.021,
+      "acc_B": 0.979,
+      "acc_GBM": 0.979
+    },
+    "> 6in outside": {
+      "n": 257448,
+      "strike_rate": 0.001,
+      "acc_B": 0.999,
+      "acc_GBM": 0.999
+    }
+  },
+  "mean_abs_shap": {
+    "zn": 3.2839,
+    "xn": 3.0873,
+    "strikes": 0.3543,
+    "sz_top": 0.1435,
+    "balls": 0.1019,
+    "release_speed": 0.1006,
+    "framing": 0.0985,
+    "sz_bot": 0.0854,
+    "batter_R": 0.0625,
+    "pitch_type": 0.0417,
+    "pfx_z": 0.0324,
+    "pitcher_R": 0.0282,
+    "pfx_x": 0.0278,
+    "spin_rate": 0.0244
+  },
+  "edge_strike_rate_by_pitch_type": {
+    "FF": 0.607,
+    "CH": 0.617,
+    "FC": 0.639,
+    "SL": 0.649,
+    "CU": 0.652,
+    "ST": 0.654,
+    "SI": 0.656
+  },
+  "framing_per_1000_quantiles": {
+    "0.0": -16.2,
+    "0.1": -8.9,
+    "0.5": -1.4,
+    "0.9": 9.4,
+    "1.0": 18.1
+  }
+}

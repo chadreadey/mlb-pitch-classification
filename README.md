@@ -48,9 +48,36 @@ Within an inch outside the rulebook zone, umpires call about half the pitches st
 
 The full script output is in [`results/baseline_logit.txt`](results/baseline_logit.txt). [`METHODOLOGY.md`](METHODOLOGY.md) has the data rules, the evaluation protocol, extra checks on the 2019 gap, and next steps.
 
+## 4. Gradient boosting: pitch type, movement and catcher framing
+
+`scripts/gbm.py` fits LightGBM in three steps, to separate what the model's flexibility buys from what the new features buy:
+
+1. **Zone + count:** the same information as Model B (batter-relative location, zone top and bottom, handedness, count), with no hand-built terms.
+2. **+ pitch:** pitch type, release speed, spin rate, horizontal and vertical movement, pitcher handedness.
+3. **+ framing:** a catcher framing score. This is each catcher's called strikes above what Model B expects from location and count, shrunk toward zero by n / (n + 2,000) pitches. For training rows it is computed out-of-fold by game, so a pitch's own call never feeds its own feature.
+
+Splits: fit on 2022–23 (707,292 pitches). 2024 is split by game into an early-stopping half and an isotonic-calibration half. Test on the same 708,016 pitches from 2025–26. The GBMs see one season less training data than Model B.
+
+| Model | Accuracy | Log loss | Brier | AUC |
+|---|---|---|---|---|
+| B: logistic, batter-relative zone + count | 93.51% | 0.1542 | 0.0465 | 0.9842 |
+| GBM: zone + count | 94.05% | 0.1403 | 0.0428 | 0.9866 |
+| GBM: + pitch | **94.17%** | **0.1383** | **0.0424** | **0.9870** |
+| GBM: + pitch + framing | 94.13% | 0.1383 | 0.0424 | 0.9870 |
+
+How to read this:
+- **Most of the gain is flexibility, not new information.** The GBM on the same zone-and-count inputs beats the logistic model by half a point of accuracy and cuts log loss by 9%.
+- **Pitch features add a little more:** +0.12 points of accuracy.
+- **The framing score adds nothing measurable** on 2025–26, even though catchers differ: from the 10th to the 90th percentile it spans −8.9 to +9.4 called strikes per 1,000 called pitches (69 catchers with at least 5,000 called pitches in 2022–24). That is about 1–2% of calls, mostly far from the edge, and it may not carry over from 2022–24 to 2025–26.
+- **The gain is at the edge.** Within an inch outside the zone, accuracy rises from 64.9% to 69.8%; within an inch inside, from 77.1% to 78.4%; 1–3 inches outside, from 81.1% to 83.3%.
+- **Location still dominates.** Mean |SHAP| in log-odds: vertical location 3.28, horizontal 3.09, strikes 0.35, zone top 0.14, balls 0.10, release speed 0.10, framing 0.10, everything else below 0.09.
+- **Four-seamers get the fewest edge strikes.** Within an inch of the zone edge (either side), the called-strike rate is 60.7% for four-seam fastballs and 61.7% for changeups, against 65.6% for sinkers. This is from the data directly, not the model.
+
+Each GBM was fit with one seed. Full output: [`results/gbm.txt`](results/gbm.txt) and [`results/gbm.json`](results/gbm.json). The demo still runs Model B.
+
 ## Limitations
 
-- **Linear model, hand-built features.** Both models are logistic regressions. Pitch type, movement, catcher framing and umpire identity are not used yet; gradient boosting on those is the planned next step.
+- **No umpire ID, one framing definition.** The GBM uses pitch type, movement and a catcher framing score, but not umpire identity. The framing score is one simple residual-based definition; a better one might help where this one didn't.
 - **No umpire ID.** Statcast doesn't include the home-plate umpire, so per-umpire zones are out of scope until that join is built.
 - **Accuracy at 0.5.** About a third of test pitches are strikes. Log loss and Brier are the better measures for a probability; accuracy is reported because the 2019 notebook used it.
 - **Unscripted checks.** The sample-size and 2019-only checks in METHODOLOGY.md §5 were one-off runs and are not in `scripts/`.
@@ -68,14 +95,18 @@ The full script output is in [`results/baseline_logit.txt`](results/baseline_log
 uv venv --python 3.12 && uv pip install -r requirements.txt
 .venv/bin/python scripts/fetch_statcast.py 2022 2023 2024 2025 2026   # ~2 min per season; pybaseball caches raw pulls
 .venv/bin/python scripts/baseline_logit.py | tee results/baseline_logit.txt   # ~30 s
+.venv/bin/python scripts/gbm.py | tee results/gbm.txt                         # ~75 s on a laptop
 ```
 
 | Path | Contents |
 |---|---|
 | `scripts/fetch_statcast.py` | Downloads called pitches per season to `data/called_pitches_<year>.parquet` |
+| `scripts/common.py` | Data loading, batter-relative features, edge distance (shared) |
 | `scripts/baseline_logit.py` | Models A and B, accuracy by edge distance, count effect |
+| `scripts/gbm.py` | LightGBM variants, framing score, SHAP, edge accuracy |
 | `results/baseline_logit.txt` | Output of the last run |
 | `results/model_b.json` | Model B coefficients on the raw feature scale, plus its test metrics |
+| `results/gbm.txt`, `results/gbm.json` | GBM output and metrics |
 | `METHODOLOGY.md` | Data rules, evaluation protocol, extra checks, goals, changelog |
 | `demo/index.html` | Static interactive strike zone running Model B |
 | `MLB_Python_Code_Report.ipynb` | The original 2023 analysis (Kelley, Readey, Hasler) |
