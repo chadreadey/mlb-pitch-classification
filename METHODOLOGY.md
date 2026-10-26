@@ -102,7 +102,7 @@ the Kaggle file would close this fully; not done.
 1. **Gradient boosting.** Done 2026-10-26 (`scripts/gbm.py`, see README §4): 94.17% / log loss
    0.1383 / AUC 0.9870 with pitch features, gains concentrated within ±3 in of the edge. The
    framing score added nothing measurable. Not done: partial dependence plots, seed spread,
-   moving the demo to the GBM (needs ONNX, step 4).
+   (the demo moved to the GBM the same day).
 2. **Umpire join.** Statcast has no umpire column. Pull home-plate umpire per game_pk from the
    MLB stats API (`/api/v1/game/{game_pk}/boxscore` → officials) and join. Then: per-umpire
    zone maps, umpire consistency ranking, and whether umpire ID beats catcher ID as a feature.
@@ -145,3 +145,7 @@ the Kaggle file would close this fully; not done.
   and zone-size controls. Its JS output matches Python to 5 decimals on spot checks.
 - 2026-10-26: shared loading/features moved to `scripts/common.py` (baseline output byte-identical).
   Added `scripts/gbm.py` (Model C, LightGBM) and `results/gbm.{txt,json}`. Demo unchanged.
+- 2026-10-26: demo moved from Model B to the "GBM: + pitch" model, exported to ONNX by `gbm.py`
+  and run with ONNX Runtime Web (calibration and pitch profiles in `demo/model.json`). Browser
+  output matches Python ONNX Runtime to 5 decimals on spot checks. `gbm.py`'s edge table and
+  SHAP now describe this model rather than the framing variant.

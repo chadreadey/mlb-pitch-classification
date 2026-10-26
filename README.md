@@ -69,11 +69,13 @@ How to read this:
 - **Most of the gain is flexibility, not new information.** The GBM on the same zone-and-count inputs beats the logistic model by half a point of accuracy and cuts log loss by 9%.
 - **Pitch features add a little more:** +0.12 points of accuracy.
 - **The framing score adds nothing measurable** on 2025–26, even though catchers differ: from the 10th to the 90th percentile it spans −8.9 to +9.4 called strikes per 1,000 called pitches (69 catchers with at least 5,000 called pitches in 2022–24). That is about 1–2% of calls, mostly far from the edge, and it may not carry over from 2022–24 to 2025–26.
-- **The gain is at the edge.** Within an inch outside the zone, accuracy rises from 64.9% to 69.8%; within an inch inside, from 77.1% to 78.4%; 1–3 inches outside, from 81.1% to 83.3%.
-- **Location still dominates.** Mean |SHAP| in log-odds: vertical location 3.28, horizontal 3.09, strikes 0.35, zone top 0.14, balls 0.10, release speed 0.10, framing 0.10, everything else below 0.09.
+- **The gain is at the edge.** For the "+ pitch" model: within an inch outside the zone, accuracy rises from 64.9% to 69.9%; within an inch inside, from 77.1% to 78.4%; 1–3 inches outside, from 81.1% to 83.6%.
+- **Location still dominates.** Mean |SHAP| in log-odds for the "+ pitch" model: vertical location 3.44, horizontal 3.20, strikes 0.36, zone top 0.16, balls 0.11, release speed 0.11, everything else 0.10 or less.
 - **Four-seamers get the fewest edge strikes.** Within an inch of the zone edge (either side), the called-strike rate is 60.7% for four-seam fastballs and 61.7% for changeups, against 65.6% for sinkers. This is from the data directly, not the model.
 
-Each GBM was fit with one seed. Full output: [`results/gbm.txt`](results/gbm.txt) and [`results/gbm.json`](results/gbm.json). The demo still runs Model B.
+Each GBM was fit with one seed. Full output: [`results/gbm.txt`](results/gbm.txt) and [`results/gbm.json`](results/gbm.json).
+
+**The demo runs the "+ pitch" GBM** in the browser. `gbm.py` exports it to ONNX (`demo/model.onnx`; max difference from LightGBM 4.6e-4 on 20,000 test rows) and writes `demo/model.json` with the isotonic calibration table and each pitch type's median speed, spin and movement by pitcher hand. The page runs it with ONNX Runtime Web. With the demo model, a right-hander's four-seamer on the outside edge at mid-zone to a right-handed batter is a called strike 69% of the time at 0-2 and 88% at 3-0.
 
 ## Limitations
 
@@ -81,7 +83,7 @@ Each GBM was fit with one seed. Full output: [`results/gbm.txt`](results/gbm.txt
 - **No umpire ID.** Statcast doesn't include the home-plate umpire, so per-umpire zones are out of scope until that join is built.
 - **Accuracy at 0.5.** About a third of test pitches are strikes. Log loss and Brier are the better measures for a probability; accuracy is reported because the 2019 notebook used it.
 - **Unscripted checks.** The sample-size and 2019-only checks in METHODOLOGY.md §5 were one-off runs and are not in `scripts/`.
-- **Demo zone sizes.** [`demo/index.html`](demo/index.html), the interactive strike zone, runs Model B with coefficients copied from `results/model_b.json`. It offers three batter zones (10th percentile, mean and 90th percentile of 2022–24 `sz_top`/`sz_bot`), not every batter's.
+- **Demo inputs.** [`demo/index.html`](demo/index.html) runs the "+ pitch" GBM. Each pitch type uses its median speed, spin and movement for that pitcher hand, and there are three batter zones (10th percentile, mean and 90th percentile of 2022–24 `sz_top`/`sz_bot`), not every pitcher's or batter's.
 - **2026 data.** The 2026 season was pulled on 2026-10-11, after the regular season ended (postseason is excluded anyway).
 
 ## Data and terms
@@ -95,7 +97,8 @@ Each GBM was fit with one seed. Full output: [`results/gbm.txt`](results/gbm.txt
 uv venv --python 3.12 && uv pip install -r requirements.txt
 .venv/bin/python scripts/fetch_statcast.py 2022 2023 2024 2025 2026   # ~2 min per season; pybaseball caches raw pulls
 .venv/bin/python scripts/baseline_logit.py | tee results/baseline_logit.txt   # ~30 s
-.venv/bin/python scripts/gbm.py | tee results/gbm.txt                         # ~75 s on a laptop
+.venv/bin/python scripts/gbm.py | tee results/gbm.txt                         # ~75 s on a laptop; also writes demo/model.*
+cd demo && python3 -m http.server 8000                                        # the demo fetches its model, so serve it
 ```
 
 | Path | Contents |
@@ -107,6 +110,7 @@ uv venv --python 3.12 && uv pip install -r requirements.txt
 | `results/baseline_logit.txt` | Output of the last run |
 | `results/model_b.json` | Model B coefficients on the raw feature scale, plus its test metrics |
 | `results/gbm.txt`, `results/gbm.json` | GBM output and metrics |
+| `demo/model.onnx`, `demo/model.json` | Demo model (ONNX), calibration table, pitch profiles (written by `gbm.py`) |
 | `METHODOLOGY.md` | Data rules, evaluation protocol, extra checks, goals, changelog |
-| `demo/index.html` | Static interactive strike zone running Model B |
+| `demo/index.html` | Interactive strike zone running the GBM in the browser |
 | `MLB_Python_Code_Report.ipynb` | The original 2023 analysis (Kelley, Readey, Hasler) |

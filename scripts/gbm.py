@@ -74,13 +74,13 @@ for name, cols in VARIANTS.items():
                   callbacks=[lgb.early_stopping(100, verbose=False)])
     ir = IsotonicRegression(out_of_bounds="clip").fit(b.predict(X.loc[iso.index, cols]), iso.called_strike)
     p = ir.predict(b.predict(X.loc[te.index, cols]))
-    preds[name], boosters[name] = p, (b, cols)
+    preds[name], boosters[name] = p, (b, cols, ir)
     results[name] = metrics(p) | {"rounds": b.best_iteration}
     line(name + f" ({b.best_iteration} rounds)", results[name])
 
 # --- where the gain lives ---
 cat = pd.cut(edge_dist(te), bins=EDGE_BINS, labels=EDGE_LABELS)
-best = "GBM: + pitch + framing"
+best = "GBM: + pitch"            # the headline and demo model; framing is an ablation
 tab = pd.DataFrame({"bucket": cat, "n": 1, "strike_rate": yt,
                     "acc_B": (preds["Model B (logistic, 2022-24)"] > 0.5) == yt, "acc_GBM": (preds[best] > 0.5) == yt}) \
         .groupby("bucket", observed=True).agg(n=("n", "sum"), strike_rate=("strike_rate", "mean"), acc_B=("acc_B", "mean"), acc_GBM=("acc_GBM", "mean"))
@@ -90,7 +90,7 @@ print(f"\naccuracy by distance from the batter's zone edge (test set), Model B v
 print(tab.round(3).to_string())
 
 # --- what the full model uses: mean |SHAP| on a 100k test sample ---
-b, cols = boosters[best]
+b, cols, _ = boosters[best]
 sample = X.loc[te.index, cols].sample(100_000, random_state=0)
 contrib = b.predict(sample, pred_contrib=True)[:, :-1]
 shap = pd.Series(np.abs(contrib).mean(0), index=cols).sort_values(ascending=False)
@@ -122,5 +122,49 @@ out = {"splits": {"fit": FIT_YEARS, "early_stop_and_calibrate": CAL_YEARS, "test
        "mean_abs_shap": shap.round(4).to_dict(),
        "edge_strike_rate_by_pitch_type": {k: round(v, 3) for k, v in pt["mean"].items()},
        "framing_per_1000_quantiles": {str(k): v for k, v in q.items()}}
+
+# --- export the demo model: "GBM: + pitch" (framing needs a catcher, which the demo doesn't ask for) ---
+import onnxmltools, onnxruntime as ort
+from onnxmltools.convert.common.data_types import FloatTensorType
+DEMO = "GBM: + pitch"
+b, cols, ir = boosters[DEMO]
+def as_float(frame):          # ONNX input: float32 matrix, pitch type as its category code
+    f = frame[cols].copy(); f["pitch_type"] = f.pitch_type.cat.codes
+    return f.to_numpy(np.float32)
+onx = onnxmltools.convert_lightgbm(b, initial_types=[("input", FloatTensorType([None, len(cols)]))], target_opset=15, zipmap=False)
+for o in onx.graph.output:   # the converter declares the label output as length 1; make the batch dim symbolic
+    o.type.tensor_type.shape.dim[0].dim_param = "N"
+(ROOT / "demo" / "model.onnx").write_bytes(onx.SerializeToString())
+chk = X.loc[te.index, cols].sample(20_000, random_state=1)
+sess = ort.InferenceSession(onx.SerializeToString())
+parity = float(np.abs(sess.run(None, {"input": as_float(chk)})[1][:, 1] - b.predict(chk)).max())
+print(f"\nONNX export of {DEMO}: {b.num_trees()} trees, max |ONNX - LightGBM| on 20k test rows = {parity:.1e}")
+
+# typical speed / spin / movement per pitcher hand and pitch type (2022-23 medians)
+prof = df.loc[fit.index].assign(pt=X.loc[fit.index, "pitch_type"].astype(str), hand=df.loc[fit.index, "p_throws"]) \
+         .groupby(["hand", "pt"])[["release_speed", "release_spin_rate", "pfx_x", "pfx_z"]].median().round(2)
+profiles = {h: {pt: dict(zip(["release_speed", "spin_rate", "pfx_x", "pfx_z"], map(float, r))) for (hh, pt), r in prof.iterrows() if hh == h}
+            for h in ("R", "L")}
+
+# count grid with the demo model: RHP four-seamer, RHB, outside edge (xn = 1), mid-zone, mean zone
+top, bot = float(fit.sz_top.mean()), float(fit.sz_bot.mean())
+ff = profiles["R"]["FF"]
+grid = pd.DataFrame([dict(xn=1.0, zn=0.0, sz_top=top, sz_bot=bot, batter_R=1, balls=bb, strikes=ss, pitcher_R=1,
+                          pitch_type=pd.Categorical(["FF"], categories=PITCH_TYPES + ["OTH"])[0],
+                          release_speed=ff["release_speed"], spin_rate=ff["spin_rate"], pfx_x=ff["pfx_x"], pfx_z=ff["pfx_z"])
+                     for bb in range(4) for ss in range(3)])
+grid["pitch_type"] = pd.Categorical(grid.pitch_type, categories=PITCH_TYPES + ["OTH"])
+pg = ir.predict(b.predict(grid[cols]))
+count_grid = {f"{bb}-{ss}": round(float(v), 3) for (bb, ss), v in zip([(bb, ss) for bb in range(4) for ss in range(3)], pg)}
+print("\nP(called strike), demo model, RHP four-seamer to a RHB on the outside edge at mid-zone, by count:")
+print(pd.Series(count_grid).to_frame("p").T.to_string())
+
+meta = {"model": DEMO, "features": cols, "pitch_types": PITCH_TYPES + ["OTH"], "trees": b.num_trees(),
+        "test": {m: round(float(v), 4) for m, v in results[DEMO].items()}, "onnx_parity_max_abs": parity,
+        "isotonic": {"x": [round(float(v), 6) for v in ir.X_thresholds_], "y": [round(float(v), 6) for v in ir.y_thresholds_]},
+        "zone_sizes": {"small": [3.12, 1.44], "avg": [round(top, 3), round(bot, 3)], "tall": [3.64, 1.75]},
+        "profiles": profiles, "count_grid_rhp_ff_rhb_outside_edge": count_grid}
+(ROOT / "demo" / "model.json").write_text(json.dumps(meta, indent=1) + "\n")
+out["demo_count_grid"] = count_grid
 (ROOT / "results" / "gbm.json").write_text(json.dumps(out, indent=2) + "\n")
-print("\nwrote results/gbm.json")
+print("\nwrote results/gbm.json, demo/model.onnx, demo/model.json")
