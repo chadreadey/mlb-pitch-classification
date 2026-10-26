@@ -2,7 +2,7 @@
 
 This project began in 2023 as a group project with **Carli Kelley, Chad Readey and Garner Hasler**. That work fit a logistic regression on about 8,000 pitches from the 2019 season and is kept unchanged in [`MLB_Python_Code_Report.ipynb`](MLB_Python_Code_Report.ipynb). Carli Kelley's original repository is [here](https://github.com/carli-kelley/mlb-pitch-classification); I host this copy with permission.
 
-The 2026 rebuild (`scripts/`, `METHODOLOGY.md`) is my own work. It asks a narrower question, **will the umpire call this taken pitch a strike?**, and answers it on every called pitch in Statcast from 2022 to 2026 with an out-of-time test.
+The 2026 rebuild (`scripts/`, `METHODOLOGY.md`) is my own work. Write-up: [How much does the count move the strike zone?](https://chadreadey.github.io/mlb/writeup.html). It asks a narrower question, **will the umpire call this taken pitch a strike?**, and answers it on every called pitch in Statcast from 2022 to 2026 with an out-of-time test.
 
 ## 1. What the rebuild changes
 
