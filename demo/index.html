@@ -44,7 +44,7 @@
 <body>
 <header>
   <h1>Ball or Strike?</h1>
-  <p>Click anywhere to place a pitch, set the count, and see the chance a logistic regression trained on 8,147 pitches from the 2019 MLB season gives it of ending as a strike (called, swinging, or foul). Catcher's view.</p>
+  <p>Place a pitch, set the count and the batter, and see the chance the umpire calls a taken pitch a strike. The model is a logistic regression trained on 1.06M called pitches from 2022–24 and tested on 708K from 2025–26. Catcher's view.</p>
   <a class="back" href="../#projects">← back to portfolio</a>
 </header>
 <main>
@@ -63,30 +63,47 @@
       <div class="seg" id="balls"><button data-v="0" class="on">0</button><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button></div></div>
     <div class="row"><label>Strikes</label>
       <div class="seg" id="strikes"><button data-v="0" class="on">0</button><button data-v="1">1</button><button data-v="2">2</button></div></div>
+    <div class="row"><label>Batter</label>
+      <div class="seg" id="side"><button data-v="R" class="on">RHB</button><button data-v="L">LHB</button></div></div>
+    <div class="row"><label>Batter's zone</label>
+      <div class="seg" id="size"><button data-v="small">small</button><button data-v="avg" class="on">average</button><button data-v="tall">tall</button></div></div>
     <div class="coords"><span>horizontal <b id="px">0.00</b> ft</span><span>height <b id="pz">0.00</b> ft</span></div>
     <div class="model">
       <div class="stats">
-        <div class="stat"><b>82.4%</b>test accuracy</div>
-        <div class="stat"><b>0.916</b>train AUC</div>
-        <div class="stat"><b>6</b>terms</div>
+        <div class="stat"><b>93.5%</b>test accuracy</div>
+        <div class="stat"><b>0.984</b>test AUC</div>
+        <div class="stat"><b>17</b>terms</div>
       </div>
-      <p><code>logit = −5.02 + 0.11·px + 6.54·pz + 0.16·balls + 0.41·strikes − 2.05·px² − 1.36·pz²</code></p>
-      <p>The squared terms give the zone its elliptical shape. The count terms are the count effect the model learned. Try a 3-0 count versus 0-2 on the same corner pitch and watch the 50% line move.</p>
-      <p>Model from <a href="https://github.com/chadreadey/mlb-pitch-classification" style="color:var(--accent)">mlb-pitch-classification</a>, originally built with Carli Kelley and Garner Hasler. Interactive version by Chad Readey.</p>
+      <p>Location is measured relative to the batter's own rulebook zone: <code>xn = px / 0.83</code>, <code>zn = (pz − zone centre) / zone half-height</code>, so the zone is the square [−1, 1]². The model uses polynomial terms in xn and zn, batter handedness, and the count, including count × location interactions.</p>
+      <p>Try a 3-0 count against 0-2 on the same corner pitch and watch the 50% line move. "Small" and "tall" use the 10th and 90th percentile zones from 2022–24.</p>
+      <p>Model B from the <a href="https://github.com/chadreadey/mlb-pitch-classification" style="color:var(--accent)">mlb-pitch-classification</a> rebuild (coefficients in <code>results/model_b.json</code>). The original 2019 project was built with Carli Kelley and Garner Hasler. Interactive version by Chad Readey.</p>
     </div>
   </div>
 </main>
 <script>
-  const C = { int: -5.0158, px: 0.1145, pz: 6.5409, b: 0.1608, s: 0.4103, px2: -2.0492, pz2: -1.3637 };
-  const pStrike = (px, pz, b, s) => 1 / (1 + Math.exp(-(C.int + C.px*px + C.pz*pz + C.b*b + C.s*s + C.px2*px*px + C.pz2*pz*pz)));
+  // Model B on the raw feature scale, copied from results/model_b.json (scripts/baseline_logit.py)
+  const M = { int: 5.998861,
+    xn: -0.362173, zn: -0.098555, xn2: -3.771258, zn2: -3.699484, xnzn: 0.184757, xn4: -0.932067, zn4: -0.434192,
+    xn2zn2: 1.762555, R: -0.257555, R_xn: 0.650839, R_xn2: 0.620212, balls: 0.171715, strikes: -0.574498,
+    balls_xn2: 0.005591, strikes_xn2: 0.074608, balls_zn2: 0.058567, strikes_zn2: -0.031627 };
+  // sz_top / sz_bot in ft: 10th, mean, 90th percentile of 2022-24 called pitches
+  const SIZES = { small: [3.12, 1.44], avg: [3.382, 1.598], tall: [3.64, 1.75] };
+  function pStrike(px, pz, b, s, side, size) {
+    const [top, bot] = SIZES[size], xn = px / 0.83, zn = (pz - (top + bot) / 2) / ((top - bot) / 2);
+    const R = side === "R" ? 1 : 0, x2 = xn * xn, z2 = zn * zn;
+    const t = M.int + M.xn*xn + M.zn*zn + M.xn2*x2 + M.zn2*z2 + M.xnzn*xn*zn + M.xn4*x2*x2 + M.zn4*z2*z2
+      + M.xn2zn2*x2*z2 + M.R*R + M.R_xn*R*xn + M.R_xn2*R*x2 + M.balls*b + M.strikes*s
+      + M.balls_xn2*b*x2 + M.strikes_xn2*s*x2 + M.balls_zn2*b*z2 + M.strikes_zn2*s*z2;
+    return 1 / (1 + Math.exp(-t));
+  }
 
   const X0 = -2.0, X1 = 2.0, Z0 = 0.0, Z1 = 5.0;
-  const ZONE = { x0: -0.83, x1: 0.83, z0: 1.5, z1: 3.5 };
+  const zoneOf = size => ({ x0: -0.83, x1: 0.83, z0: SIZES[size][1], z1: SIZES[size][0] });
   const cv = document.getElementById("zone"), ctx = cv.getContext("2d");
   const W = cv.width, H = cv.height;
   const toPix = (px, pz) => [ (px - X0) / (X1 - X0) * W, H - (pz - Z0) / (Z1 - Z0) * H ];
   const toWorld = (x, y) => [ X0 + x / W * (X1 - X0), Z0 + (H - y) / H * (Z1 - Z0) ];
-  let state = { px: 0.0, pz: 2.5, b: 0, s: 0 };
+  let state = { px: 0.0, pz: 2.5, b: 0, s: 0, side: "R", size: "avg" };
 
   function color(p) {
     const st = [[46,125,50],[241,196,15],[192,57,43]];
@@ -95,12 +112,12 @@
     return a.map((v, i) => Math.round(v + (b[i] - v) * t));
   }
   const heatCache = {};
-  function heatmap(b, s) {
-    const key = b + "-" + s; if (heatCache[key]) return heatCache[key];
+  function heatmap({ b, s, side, size }) {
+    const key = [b, s, side, size].join("-"); if (heatCache[key]) return heatCache[key];
     const step = 4, img = ctx.createImageData(W, H);
     for (let y = 0; y < H; y += step) for (let x = 0; x < W; x += step) {
       const [px, pz] = toWorld(x + step/2, y + step/2);
-      const [r, g, bl] = color(pStrike(px, pz, b, s));
+      const [r, g, bl] = color(pStrike(px, pz, b, s, side, size));
       for (let dy = 0; dy < step; dy++) for (let dx = 0; dx < step; dx++) {
         const i = ((y + dy) * W + (x + dx)) * 4;
         img.data[i] = r; img.data[i+1] = g; img.data[i+2] = bl; img.data[i+3] = 255;
@@ -110,7 +127,8 @@
   }
 
   function draw() {
-    ctx.putImageData(heatmap(state.b, state.s), 0, 0);
+    ctx.putImageData(heatmap(state), 0, 0);
+    const ZONE = zoneOf(state.size), zc = (ZONE.z0 + ZONE.z1) / 2;
     ctx.fillStyle = "rgba(255,255,255,0.28)"; ctx.fillRect(0, 0, W, H);
 
     // 50% contour: march outward from the zone centre
@@ -119,8 +137,8 @@
     for (let deg = 0; deg <= 360; deg += 2) {
       const a = deg * Math.PI / 180; let hit = null;
       for (let r = 0; r < 3; r += 0.01) {
-        const px = 0.03 + Math.cos(a) * r, pz = 2.4 + Math.sin(a) * r;
-        if (pStrike(px, pz, state.b, state.s) < 0.5) { hit = [px, pz]; break; }
+        const px = Math.cos(a) * r, pz = zc + Math.sin(a) * r;
+        if (pStrike(px, pz, state.b, state.s, state.side, state.size) < 0.5) { hit = [px, pz]; break; }
       }
       if (!hit) continue;
       const [x, y] = toPix(hit[0], hit[1]);
@@ -144,7 +162,10 @@
 
     ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.font = "600 12px Montserrat"; ctx.textAlign = "center";
     ctx.fillText("RULEBOOK STRIKE ZONE", (zx0 + zx1) / 2, zy0 - 8);
-    ctx.font = "500 11px Montserrat"; ctx.fillText("- - -  50% line for this count", (zx0 + zx1) / 2, H - 46);
+    ctx.font = "500 11px Montserrat"; ctx.fillText("- - -  50% line for this count and batter", (zx0 + zx1) / 2, H - 46);
+    // catcher's view: a right-handed batter stands on the catcher's left (negative px)
+    const [bx0] = toPix(state.side === "R" ? -1.55 : 1.55, 0);
+    ctx.font = "600 12px Montserrat"; ctx.fillText(state.side === "R" ? "RHB" : "LHB", bx0, toPix(0, zc)[1]);
 
     const [bx, by] = toPix(state.px, state.pz);
     ctx.beginPath(); ctx.arc(bx, by, 13, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
@@ -152,7 +173,7 @@
     ctx.beginPath(); ctx.arc(bx - 9, by, 11, -0.9, 0.9); ctx.stroke();
     ctx.beginPath(); ctx.arc(bx + 9, by, 11, Math.PI - 0.9, Math.PI + 0.9); ctx.stroke();
 
-    const p = pStrike(state.px, state.pz, state.b, state.s);
+    const p = pStrike(state.px, state.pz, state.b, state.s, state.side, state.size);
     document.getElementById("pct").textContent = (p * 100).toFixed(1) + "%";
     const call = document.getElementById("call");
     call.textContent = p >= 0.5 ? "predicted STRIKE" : "predicted BALL"; call.className = "call " + (p >= 0.5 ? "strike" : "ball");
@@ -171,10 +192,11 @@
   cv.addEventListener("pointermove", e => { if (dragging) setFromEvent(e); });
   cv.addEventListener("pointerup", () => dragging = false);
   cv.addEventListener("pointercancel", () => dragging = false);
-  for (const id of ["balls", "strikes"]) document.getElementById(id).addEventListener("click", e => {
+  const KEYS = { balls: "b", strikes: "s", side: "side", size: "size" };
+  for (const id in KEYS) document.getElementById(id).addEventListener("click", e => {
     const btn = e.target.closest("button"); if (!btn) return;
     [...btn.parentElement.children].forEach(b => b.classList.toggle("on", b === btn));
-    state[id === "balls" ? "b" : "s"] = +btn.dataset.v; draw();
+    const v = btn.dataset.v; state[KEYS[id]] = id === "side" || id === "size" ? v : +v; draw();
   });
   document.addEventListener("keydown", e => {
     const d = 0.05;

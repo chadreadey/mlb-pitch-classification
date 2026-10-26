@@ -1,10 +1,11 @@
-import pathlib, numpy as np, pandas as pd
+import json, pathlib, numpy as np, pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import accuracy_score, log_loss, brier_score_loss, roc_auc_score
 
-DATA = pathlib.Path(__file__).resolve().parents[1] / "data"
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+DATA = ROOT / "data"
 TRAIN_YEARS, TEST_YEARS = [2022, 2023, 2024], [2025, 2026]   # 2019 is deliberately not used here
 
 df = pd.concat([pd.read_parquet(DATA / f"called_pitches_{y}.parquet") for y in TRAIN_YEARS + TEST_YEARS])
@@ -69,3 +70,19 @@ for b in range(4):
         d = pd.DataFrame({"plate_x":[0.83], "plate_z":[2.5], "sz_top":[3.5], "sz_bot":[1.5], "stand":["R"], "balls":[b], "strikes":[s]})
         rows.append((f"{b}-{s}", m.predict_proba(f_normalized(d))[0,1]))
 print(pd.DataFrame(rows, columns=["count","p_strike"]).set_index("count").T.round(3).to_string())
+
+# --- export Model B on the raw feature scale for demo/index.html ---
+sc, lr = m.named_steps["standardscaler"], m.named_steps["logisticregression"]
+w = lr.coef_[0] / sc.scale_
+names = ["xn", "zn", "xn2", "zn2", "xnzn", "xn4", "zn4", "xn2zn2", "R", "R_xn", "R_xn2",
+         "balls", "strikes", "balls_xn2", "strikes_xn2", "balls_zn2", "strikes_zn2"]
+out = {"model": "B. batter-normalized zone + hand", "train_years": TRAIN_YEARS, "test_years": TEST_YEARS,
+       "n_train": len(tr), "n_test": len(te),
+       "test": {"accuracy": round(accuracy_score(yt, p1 > 0.5), 4), "log_loss": round(log_loss(yt, p1), 4),
+                "brier": round(brier_score_loss(yt, p1), 4), "auc": round(roc_auc_score(yt, p1), 4)},
+       "intercept": float(lr.intercept_[0] - (w * sc.mean_).sum()),
+       "coef": dict(zip(names, map(float, w))),
+       "mean_sz_top": round(float(tr.sz_top.mean()), 3), "mean_sz_bot": round(float(tr.sz_bot.mean()), 3)}
+(ROOT / "results").mkdir(exist_ok=True)
+(ROOT / "results" / "model_b.json").write_text(json.dumps(out, indent=2) + "\n")
+print("\nwrote results/model_b.json")

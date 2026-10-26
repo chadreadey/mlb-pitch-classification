@@ -54,7 +54,7 @@ The full script output is in [`results/baseline_logit.txt`](results/baseline_log
 - **No umpire ID.** Statcast doesn't include the home-plate umpire, so per-umpire zones are out of scope until that join is built.
 - **Accuracy at 0.5.** About a third of test pitches are strikes. Log loss and Brier are the better measures for a probability; accuracy is reported because the 2019 notebook used it.
 - **Unscripted checks.** The sample-size and 2019-only checks in METHODOLOGY.md §5 were one-off runs and are not in `scripts/`.
-- **Demo.** [`demo/index.html`](demo/index.html), the interactive strike zone, still uses the original 2019 notebook coefficients, not the rebuilt model.
+- **Demo zone sizes.** [`demo/index.html`](demo/index.html), the interactive strike zone, runs Model B with coefficients copied from `results/model_b.json`. It offers three batter zones (10th percentile, mean and 90th percentile of 2022–24 `sz_top`/`sz_bot`), not every batter's.
 - **2026 data.** The 2026 season was pulled on 2026-10-11, after the regular season ended (postseason is excluded anyway).
 
 ## Data and terms
@@ -75,6 +75,7 @@ uv venv --python 3.12 && uv pip install -r requirements.txt
 | `scripts/fetch_statcast.py` | Downloads called pitches per season to `data/called_pitches_<year>.parquet` |
 | `scripts/baseline_logit.py` | Models A and B, accuracy by edge distance, count effect |
 | `results/baseline_logit.txt` | Output of the last run |
+| `results/model_b.json` | Model B coefficients on the raw feature scale, plus its test metrics |
 | `METHODOLOGY.md` | Data rules, evaluation protocol, extra checks, goals, changelog |
-| `demo/index.html` | Static interactive strike zone (2019 coefficients) |
+| `demo/index.html` | Static interactive strike zone running Model B |
 | `MLB_Python_Code_Report.ipynb` | The original 2023 analysis (Kelley, Readey, Hasler) |

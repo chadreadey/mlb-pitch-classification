@@ -99,7 +99,7 @@ the Kaggle file would close this fully; not done.
    arriving in MLB.
 4. **Demo v2.** Export the winning model to ONNX, run in-browser with onnxruntime-web, add
    batter-height slider, handedness toggle, pitch-type dropdown, and (after step 2) an umpire
-   dropdown with side-by-side zones. Replace the 2019 coefficients currently in `demo/index.html`.
+   dropdown with side-by-side zones. (The demo already runs Model B as of 2026-10-26.)
 
 ### Research branch (different question, do after the above)
 5. **Sequence model.** Transformer or GRU over the pitch sequence within an at-bat and the
@@ -127,3 +127,6 @@ the Kaggle file would close this fully; not done.
   The §4 results are the 2022–24-only numbers, reproduced exactly by the fixed script.
   Output saved to `results/baseline_logit.txt`. Re-fetching 2022 from Statcast gave a file
   identical row-for-row to the 2026-10-12 pull.
+- 2026-10-26: `baseline_logit.py` writes Model B's raw-scale coefficients to `results/model_b.json`.
+  `demo/index.html` now runs Model B instead of the 2019 notebook coefficients, with batter-side
+  and zone-size controls. Its JS output matches Python to 5 decimals on spot checks.
