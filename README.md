@@ -71,7 +71,7 @@ How to read this:
 - **The framing score adds nothing measurable** on 2025–26, even though catchers differ: from the 10th to the 90th percentile it spans −8.9 to +9.4 called strikes per 1,000 called pitches (69 catchers with at least 5,000 called pitches in 2022–24). That is about 1–2% of calls, mostly far from the edge, and it may not carry over from 2022–24 to 2025–26.
 - **The gain is at the edge.** For the "+ pitch" model: within an inch outside the zone, accuracy rises from 64.9% to 69.9%; within an inch inside, from 77.1% to 78.4%; 1–3 inches outside, from 81.1% to 83.6%.
 - **Location still dominates.** Mean |SHAP| in log-odds for the "+ pitch" model: vertical location 3.44, horizontal 3.20, strikes 0.36, zone top 0.16, balls 0.11, release speed 0.11, everything else 0.10 or less.
-- **Four-seamers get the fewest edge strikes.** Within an inch of the zone edge (either side), the called-strike rate is 60.7% for four-seam fastballs and 61.7% for changeups, against 65.6% for sinkers. This is from the data directly, not the model.
+- **Four-seamers get the fewest edge strikes.** Within an inch of the zone edge (either side), the called-strike rate is 60.7% for four-seam fastballs and 61.7% for changeups, against 65.6% for sinkers. These are raw rates from the data, not the model, and they don't hold the exact location fixed: at one spot (outside edge, mid-zone, 3-0, RHP to RHB) the demo model gives the four-seamer 88% and the sinker 82%.
 
 Each GBM was fit with one seed. Full output: [`results/gbm.txt`](results/gbm.txt) and [`results/gbm.json`](results/gbm.json).
 
